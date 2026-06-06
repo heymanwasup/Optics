@@ -12,12 +12,13 @@ The code is split into two parts:
 ## Quick Start
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-pytest
-python3 examples/run_hopkins_model.py
+PYTHONPATH=src /Users/eroica/anaconda3/bin/python -m pytest
+PYTHONPATH=src /Users/eroica/anaconda3/bin/python examples/run_hopkins_model.py
+PYTHONPATH=src /Users/eroica/anaconda3/bin/python examples/run_line_grating_task.py
 ```
+
+The EUV line-grating analysis notebook is available at
+`notebooks/line_grating_analysis.ipynb`.
 
 ## Minimal Example
 
