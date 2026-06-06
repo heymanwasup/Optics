@@ -1,4 +1,6 @@
-# Fourier Optics
+# Optics
+
+Optic study repository for Fourier optics simulation and EUV imaging analysis.
 
 This repository contains a compact Fourier optics imaging model for performance
 analysis.
@@ -11,14 +13,21 @@ The code is split into two parts:
 
 ## Quick Start
 
+The local Anaconda base environment is used for analysis:
+
 ```bash
 PYTHONPATH=src /Users/eroica/anaconda3/bin/python -m pytest
 PYTHONPATH=src /Users/eroica/anaconda3/bin/python examples/run_hopkins_model.py
 PYTHONPATH=src /Users/eroica/anaconda3/bin/python examples/run_line_grating_task.py
 ```
 
-The EUV line-grating analysis notebook is available at
-`notebooks/line_grating_analysis.ipynb`.
+## Analysis Notebooks
+
+- `notebooks/line_grating_analysis.ipynb`: 52 nm CD / 104 nm pitch EUV line
+  grating imaging and pupil energy analysis.
+- `DiffractiveSim.ipynb`, `FourierOptics.ipynb`, and
+  `SystemPerformanceSpecification.ipynb`: existing optics notebooks from the
+  remote repository.
 
 ## Minimal Example
 
