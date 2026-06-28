@@ -71,6 +71,26 @@ def test_photon_defect_array_supports_single_defect_everywhere() -> None:
     assert np.count_nonzero(image == 15.0) == 6
 
 
+def test_photon_defect_array_can_poisson_sample_counts() -> None:
+    kwargs = {
+        "defs": {"spot": np.ones((1, 1))},
+        "pixel_size": 1.0,
+        "photon_def": 5.0,
+        "photon_bkg": 10.0,
+        "size_x": 3.0,
+        "size_y": 3.0,
+        "column_defects": "spot",
+        "pitch": 1.0,
+        "grid_shape": (1, 1),
+    }
+
+    expected_mean = photon_defect_array(**kwargs)
+    sampled = photon_defect_array(**kwargs, poisson_sample=True, rng_seed=123)
+
+    np.testing.assert_allclose(sampled, np.random.default_rng(123).poisson(expected_mean))
+    assert np.all(sampled == np.floor(sampled))
+
+
 def test_gaussian_defect_matrix_peaks_at_amplitude() -> None:
     defect = gaussian_defect_matrix(fwhm=2.0, pixel_size=1.0, size_x=5.0)
 

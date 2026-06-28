@@ -118,17 +118,22 @@ def photon_defect_array(
     grid_shape: Shape = (10, 10),
     center: Optional[Tuple[float, float]] = None,
     max_pixels: Optional[int] = 100_000_000,
+    poisson_sample: bool = False,
+    rng_seed: Optional[int] = None,
 ) -> FloatArray:
     """Generate a photon-count image containing a centered defect-point array.
 
     ``column_defects`` may be a sequence with one defect name per column, or a
-    single defect name to fill every site with the same defect type.
+    single defect name to fill every site with the same defect type. Set
+    ``poisson_sample`` to sample the final photon-count expectation image.
     """
 
     _validate_positive(pixel_size, "pixel_size")
     _validate_positive(size_x, "size_x")
     _validate_positive(size_y, "size_y")
     _validate_positive(pitch, "pitch")
+    _validate_nonnegative(photon_def, "photon_def")
+    _validate_nonnegative(photon_bkg, "photon_bkg")
     rows, cols = _validate_grid_shape(grid_shape)
 
     canvas_cols = _physical_size_to_pixels(size_x, pixel_size, "size_x")
@@ -150,6 +155,10 @@ def photon_defect_array(
             x = x0 + col_index * pitch
             patch = np.asarray(defs[defect_name], dtype=np.float64) * photon_def
             _add_patch_at_physical_center(canvas, patch, x, y, pixel_size)
+
+    if poisson_sample:
+        rng = np.random.default_rng(rng_seed)
+        canvas = rng.poisson(canvas).astype(np.float64)
 
     return canvas
 
@@ -182,16 +191,28 @@ def example_photon_array_config(preview_pixel_size: Optional[float] = None) -> d
 def generate_example_photon_array(
     preview_pixel_size: Optional[float] = None,
     max_pixels: Optional[int] = 100_000_000,
+    poisson_sample: bool = False,
+    rng_seed: Optional[int] = None,
 ) -> FloatArray:
     """Generate the requested example, optionally using a coarser preview grid."""
 
     config = example_photon_array_config(preview_pixel_size=preview_pixel_size)
-    return photon_defect_array(max_pixels=max_pixels, **config)
+    return photon_defect_array(
+        max_pixels=max_pixels,
+        poisson_sample=poisson_sample,
+        rng_seed=rng_seed,
+        **config,
+    )
 
 
 def _validate_positive(value: float, name: str) -> None:
     if value <= 0:
         raise ValueError(f"{name} must be positive")
+
+
+def _validate_nonnegative(value: float, name: str) -> None:
+    if value < 0:
+        raise ValueError(f"{name} must be non-negative")
 
 
 def _physical_size_to_pixels(size: float, pixel_size: float, name: str) -> int:
