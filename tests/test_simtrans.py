@@ -91,6 +91,25 @@ def test_photon_defect_array_can_poisson_sample_counts() -> None:
     assert np.all(sampled == np.floor(sampled))
 
 
+def test_photon_defect_array_tapers_patch_edges() -> None:
+    image = photon_defect_array(
+        defs={"spot": np.ones((5, 5))},
+        pixel_size=1.0,
+        photon_def=10.0,
+        photon_bkg=1.0,
+        size_x=9.0,
+        size_y=9.0,
+        column_defects="spot",
+        pitch=1.0,
+        grid_shape=(1, 1),
+        edge_taper_width=2.0,
+    )
+
+    assert image[2, 2] == 1.0
+    assert image[4, 4] == 11.0
+    assert 1.0 < image[3, 3] < 11.0
+
+
 def test_gaussian_defect_matrix_peaks_at_amplitude() -> None:
     defect = gaussian_defect_matrix(fwhm=2.0, pixel_size=1.0, size_x=5.0)
 
