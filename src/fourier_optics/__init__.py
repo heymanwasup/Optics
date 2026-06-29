@@ -1,4 +1,5 @@
 from .field_simulation import FieldSimulation
+from .buildimage import PadingDefectsMatrix, build_def_lib, build_picture, plot_picture
 from .hopkins import HopkinsImagingModel
 from .SimTrans import (
     SimTrans,
@@ -16,7 +17,10 @@ from .SimTrans import (
 __all__ = [
     "FieldSimulation",
     "HopkinsImagingModel",
+    "PadingDefectsMatrix",
     "SimTrans",
+    "build_def_lib",
+    "build_picture",
     "build_photon_defect_demo",
     "example_photon_array_config",
     "gaussian_defect_library",
@@ -24,6 +28,7 @@ __all__ = [
     "generate_example_photon_array",
     "photon_defect_demo_params",
     "photon_defect_array",
+    "plot_picture",
     "save_photon_defect_demo_figures",
     "summarize_photon_image",
 ]
