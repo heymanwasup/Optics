@@ -1,4 +1,12 @@
-from .field_simulation import FieldSimulation
+from .field_simulation import (
+    FieldSimulation,
+    calculate_pupil_energy,
+    plot_pupil_energy_distribution,
+    plot_radial_pupil_energy_density,
+    pupil_energy_distribution,
+    pupil_na_grid,
+    radial_pupil_energy_density,
+)
 from .buildimage import PadingDefectsMatrix, build_def_lib, build_picture, plot_picture
 from .hopkins import HopkinsImagingModel
 from .SimTrans import (
@@ -22,13 +30,19 @@ __all__ = [
     "build_def_lib",
     "build_picture",
     "build_photon_defect_demo",
+    "calculate_pupil_energy",
     "example_photon_array_config",
     "gaussian_defect_library",
     "gaussian_defect_matrix",
     "generate_example_photon_array",
     "photon_defect_demo_params",
     "photon_defect_array",
+    "plot_pupil_energy_distribution",
     "plot_picture",
+    "plot_radial_pupil_energy_density",
+    "pupil_energy_distribution",
+    "pupil_na_grid",
+    "radial_pupil_energy_density",
     "save_photon_defect_demo_figures",
     "summarize_photon_image",
 ]

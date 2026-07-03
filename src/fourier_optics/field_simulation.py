@@ -1,13 +1,185 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
 
 
 ComplexArray = NDArray[np.complex128]
+RealArray = NDArray[np.float64]
+
+
+def pupil_na_grid(
+    shape: Tuple[int, int],
+    pixelSize: float,
+    lambda_: float,
+) -> Tuple[RealArray, RealArray, RealArray]:
+    """Return shifted pupil-plane NA coordinates for a sampled field."""
+    if len(shape) != 2 or min(shape) <= 0:
+        raise ValueError("shape must be a pair of positive integers")
+    if pixelSize <= 0:
+        raise ValueError("pixelSize must be positive")
+    if lambda_ <= 0:
+        raise ValueError("lambda_ must be positive")
+
+    rows, cols = shape
+    fy = np.fft.fftshift(np.fft.fftfreq(rows, d=pixelSize))
+    fx = np.fft.fftshift(np.fft.fftfreq(cols, d=pixelSize))
+    na_x, na_y = np.meshgrid(lambda_ * fx, lambda_ * fy)
+    return na_x, na_y, np.hypot(na_x, na_y)
+
+
+def pupil_energy_distribution(mat: ComplexArray, pixelSize: float) -> RealArray:
+    """Return shifted pupil-plane energy per sampled frequency pixel."""
+    field = np.asarray(mat, dtype=np.complex128)
+    if field.ndim != 2:
+        raise ValueError("mat must be a 2D complex matrix")
+    if pixelSize <= 0:
+        raise ValueError("pixelSize must be positive")
+
+    spectrum = np.fft.fftshift(np.fft.fft2(field))
+    return (np.abs(spectrum) ** 2 * pixelSize**2 / field.size).astype(np.float64)
+
+
+def calculate_pupil_energy(
+    mat: ComplexArray,
+    pixelSize: float,
+    NAin: float,
+    NAout: float,
+    lambda_: float,
+) -> float:
+    """Calculate total sampled energy transmitted between inner and outer NA."""
+    if NAin < 0:
+        raise ValueError("NAin must be non-negative")
+    if NAout < NAin:
+        raise ValueError("NAout must be greater than or equal to NAin")
+
+    energy = pupil_energy_distribution(mat, pixelSize)
+    _, _, radius = pupil_na_grid(energy.shape, pixelSize, lambda_)
+    mask = (radius >= NAin) & (radius <= NAout)
+    return float(energy[mask].sum())
+
+
+def plot_pupil_energy_distribution(
+    mat: ComplexArray,
+    pixelSize: float,
+    NAin: float,
+    NAout: float,
+    lambda_: float,
+    maxNA: Optional[float] = None,
+    ax: Optional[object] = None,
+    cmap: str = "magma",
+) -> Tuple[object, object]:
+    """Plot pupil energy distribution with inner and outer NA circles."""
+    if NAin < 0:
+        raise ValueError("NAin must be non-negative")
+    if NAout < NAin:
+        raise ValueError("NAout must be greater than or equal to NAin")
+
+    import matplotlib.pyplot as plt
+
+    energy = pupil_energy_distribution(mat, pixelSize)
+    na_x, na_y, radius = pupil_na_grid(energy.shape, pixelSize, lambda_)
+    if maxNA is None:
+        maxNA = float(np.nanmax(radius))
+    if maxNA <= 0:
+        raise ValueError("maxNA must be positive")
+
+    if ax is None:
+        _, ax = plt.subplots(figsize=(6.0, 5.2))
+
+    visible_energy = np.where(radius <= maxNA, energy, np.nan)
+    im = ax.imshow(
+        visible_energy,
+        origin="lower",
+        extent=(
+            float(na_x.min()),
+            float(na_x.max()),
+            float(na_y.min()),
+            float(na_y.max()),
+        ),
+        cmap=cmap,
+        interpolation="nearest",
+    )
+    ax.add_patch(plt.Circle((0.0, 0.0), NAin, fill=False, color="#4cc9f0", linewidth=1.8))
+    ax.add_patch(plt.Circle((0.0, 0.0), NAout, fill=False, color="#f72585", linewidth=1.8))
+    ax.set_xlim(-maxNA, maxNA)
+    ax.set_ylim(-maxNA, maxNA)
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlabel("NAx")
+    ax.set_ylabel("NAy")
+    ax.set_title("Pupil-plane energy distribution")
+    ax.figure.colorbar(im, ax=ax, label="Energy per pupil sample")
+    return ax, im
+
+
+def radial_pupil_energy_density(
+    mat: ComplexArray,
+    pixelSize: float,
+    lambda_: float,
+    bins: Optional[Union[int, RealArray]] = None,
+    normalize: bool = True,
+) -> Tuple[RealArray, RealArray]:
+    """Return rho(r) where rho(r) * dr is energy in the NA interval."""
+    energy = pupil_energy_distribution(mat, pixelSize)
+    _, _, radius = pupil_na_grid(energy.shape, pixelSize, lambda_)
+
+    if bins is None:
+        rows, cols = energy.shape
+        dna_y = lambda_ / (rows * pixelSize)
+        dna_x = lambda_ / (cols * pixelSize)
+        max_radius = float(np.nanmax(radius))
+        bin_count = max(1, int(np.ceil(max_radius / min(dna_x, dna_y))))
+        bin_edges = np.linspace(0.0, max_radius, bin_count + 1)
+    elif np.isscalar(bins):
+        bin_edges = np.linspace(0.0, float(np.nanmax(radius)), int(bins) + 1)
+    else:
+        bin_edges = np.asarray(bins, dtype=np.float64)
+
+    if bin_edges.ndim != 1 or bin_edges.size < 2:
+        raise ValueError("bins must define at least two bin edges")
+    if np.any(np.diff(bin_edges) <= 0):
+        raise ValueError("bin edges must be strictly increasing")
+
+    shell_energy, edges = np.histogram(radius.ravel(), bins=bin_edges, weights=energy.ravel())
+    widths = np.diff(edges)
+    density = shell_energy / widths
+    if normalize:
+        total = shell_energy.sum()
+        if total > 0:
+            density = density / total
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    return centers.astype(np.float64), density.astype(np.float64)
+
+
+def plot_radial_pupil_energy_density(
+    mat: ComplexArray,
+    pixelSize: float,
+    lambda_: float,
+    bins: Optional[Union[int, RealArray]] = None,
+    normalize: bool = True,
+    ax: Optional[object] = None,
+) -> Tuple[object, RealArray, RealArray]:
+    """Plot radial pupil energy density as a function of NA radius."""
+    import matplotlib.pyplot as plt
+
+    radius, density = radial_pupil_energy_density(
+        mat,
+        pixelSize,
+        lambda_,
+        bins=bins,
+        normalize=normalize,
+    )
+    if ax is None:
+        _, ax = plt.subplots(figsize=(6.0, 4.0))
+    ax.plot(radius, density, color="#1d3557", linewidth=1.8)
+    ax.set_xlabel("r (NA)")
+    ax.set_ylabel("Normalized energy density" if normalize else "Energy density")
+    ax.set_title("Radial pupil energy density")
+    ax.grid(True, alpha=0.3)
+    return ax, radius, density
 
 
 @dataclass
