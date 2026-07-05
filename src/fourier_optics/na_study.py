@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -9,6 +10,13 @@ from numpy.typing import ArrayLike, NDArray
 
 ComplexArray = NDArray[np.complex128]
 RealArray = NDArray[np.float64]
+FDTDData = Mapping[str, ArrayLike]
+
+
+_KEY_PATTERN = re.compile(
+    r"h(?P<height>\d+(?:\.\d+)?)w(?P<width>\d+(?:\.\d+)?)",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -31,6 +39,81 @@ class PupilEnergy:
     na_x: RealArray
     na_y: RealArray
     na_radius: RealArray
+
+
+def case_from_key(
+    key: str,
+    field: ArrayLike,
+    title: Optional[str] = None,
+    height_nm: Optional[float] = None,
+    width_nm: Optional[float] = None,
+    sevd_nm: Optional[float] = None,
+    metadata: Optional[Mapping[str, object]] = None,
+) -> FDTDCase:
+    """Build an ``FDTDCase`` from a dict key such as ``h2.5w60``."""
+    parsed_height, parsed_width = _parse_height_width_from_key(key)
+    height = parsed_height if height_nm is None else float(height_nm)
+    width = parsed_width if width_nm is None else float(width_nm)
+    if sevd_nm is None and height is not None and width is not None:
+        sevd_nm = sevd_from_gaussian_height_width(height, width)
+    return FDTDCase(
+        title=key if title is None else title,
+        field=np.asarray(field, dtype=np.complex128),
+        height_nm=height,
+        width_nm=width,
+        sevd_nm=sevd_nm,
+        metadata=metadata,
+    )
+
+
+def cases_from_fdtd_dict(
+    data_fdtd: FDTDData,
+    keys: Sequence[str],
+    titles: Optional[Mapping[str, str]] = None,
+    heights_nm: Optional[Mapping[str, float]] = None,
+    widths_nm: Optional[Mapping[str, float]] = None,
+    sevd_nm: Optional[Mapping[str, float]] = None,
+    metadata: Optional[Mapping[str, Mapping[str, object]]] = None,
+) -> list[FDTDCase]:
+    """Convert selected dict entries into ``FDTDCase`` objects for plotting."""
+    cases: list[FDTDCase] = []
+    for key in keys:
+        if key not in data_fdtd:
+            raise KeyError(f"key {key!r} is not in data_fdtd")
+        cases.append(
+            case_from_key(
+                key,
+                data_fdtd[key],
+                title=None if titles is None else titles.get(key),
+                height_nm=None if heights_nm is None else heights_nm.get(key),
+                width_nm=None if widths_nm is None else widths_nm.get(key),
+                sevd_nm=None if sevd_nm is None else sevd_nm.get(key),
+                metadata=None if metadata is None else metadata.get(key),
+            )
+        )
+    return cases
+
+
+def collected_na_energy_from_dict(
+    data_fdtd: FDTDData,
+    key: str,
+    pixel_size_um: float,
+    wavelength_um: float,
+    na_inner: float = 0.10,
+    na_outer: float = 0.28,
+    reference_field: Optional[Union[complex, ArrayLike]] = None,
+) -> float:
+    """Return collected NA energy for one selected FDTD dict entry."""
+    if key not in data_fdtd:
+        raise KeyError(f"key {key!r} is not in data_fdtd")
+    return collected_na_energy(
+        data_fdtd[key],
+        pixel_size_um=pixel_size_um,
+        wavelength_um=wavelength_um,
+        na_inner=na_inner,
+        na_outer=na_outer,
+        reference_field=reference_field,
+    )
 
 
 def sevd_from_gaussian_height_width(
@@ -247,6 +330,46 @@ def plot_cases_pupil_and_radial(
     return fig_maps, fig_radial
 
 
+def plot_fdtd_dict_pupil_and_radial(
+    data_fdtd: FDTDData,
+    keys: Sequence[str],
+    pixel_size_um: float,
+    wavelength_um: float,
+    na_inner: float = 0.10,
+    na_outer: float = 0.28,
+    reference_field: Optional[Union[complex, ArrayLike]] = None,
+    max_na: Optional[float] = 0.8,
+    bins: Optional[Union[int, ArrayLike]] = None,
+    titles: Optional[Mapping[str, str]] = None,
+    heights_nm: Optional[Mapping[str, float]] = None,
+    widths_nm: Optional[Mapping[str, float]] = None,
+    sevd_nm: Optional[Mapping[str, float]] = None,
+    log_floor: float = 1e-14,
+    cmap: str = "inferno",
+) -> Tuple[object, object]:
+    """Dict-first wrapper for multi-case pupil maps and absolute 1D NA curves."""
+    cases = cases_from_fdtd_dict(
+        data_fdtd,
+        keys,
+        titles=titles,
+        heights_nm=heights_nm,
+        widths_nm=widths_nm,
+        sevd_nm=sevd_nm,
+    )
+    return plot_cases_pupil_and_radial(
+        cases,
+        pixel_size_um=pixel_size_um,
+        wavelength_um=wavelength_um,
+        na_inner=na_inner,
+        na_outer=na_outer,
+        reference_field=reference_field,
+        max_na=max_na,
+        bins=bins,
+        log_floor=log_floor,
+        cmap=cmap,
+    )
+
+
 def plot_sevd_energy_trends(
     cases: Sequence[FDTDCase],
     pixel_size_um: float,
@@ -315,6 +438,40 @@ def plot_sevd_energy_trends(
     return fig, result
 
 
+def plot_fdtd_dict_sevd_energy_trends(
+    data_fdtd: FDTDData,
+    keys: Sequence[str],
+    pixel_size_um: float,
+    wavelength_um: float,
+    target_sevd_nm: Optional[float] = None,
+    na_inner: float = 0.10,
+    na_outer: float = 0.28,
+    reference_field: Optional[Union[complex, ArrayLike]] = None,
+    titles: Optional[Mapping[str, str]] = None,
+    heights_nm: Optional[Mapping[str, float]] = None,
+    widths_nm: Optional[Mapping[str, float]] = None,
+    sevd_nm: Optional[Mapping[str, float]] = None,
+) -> Tuple[object, RealArray]:
+    """Dict-first wrapper for SEVD trend and same-SEVD height comparison plots."""
+    cases = cases_from_fdtd_dict(
+        data_fdtd,
+        keys,
+        titles=titles,
+        heights_nm=heights_nm,
+        widths_nm=widths_nm,
+        sevd_nm=sevd_nm,
+    )
+    return plot_sevd_energy_trends(
+        cases,
+        pixel_size_um=pixel_size_um,
+        wavelength_um=wavelength_um,
+        target_sevd_nm=target_sevd_nm,
+        na_inner=na_inner,
+        na_outer=na_outer,
+        reference_field=reference_field,
+    )
+
+
 def make_demo_fdtd_cases(
     heights_nm: Sequence[float] = (1.0, 2.5, 4.0),
     widths_nm: Sequence[float] = (40.0, 60.0, 80.0, 110.0),
@@ -373,6 +530,38 @@ def make_demo_fdtd_cases(
     return cases
 
 
+def make_demo_fdtd_dict(
+    heights_nm: Sequence[float] = (1.0, 2.5, 4.0),
+    widths_nm: Sequence[float] = (40.0, 60.0, 80.0, 110.0),
+    shape: Tuple[int, int] = (512, 512),
+    pixel_size_um: float = 0.001,
+    wavelength_um: float = 0.0135,
+    phase_scale: float = 4.0 * np.pi,
+    profile: str = "gaussian",
+    carrier_na: Optional[float] = 0.18,
+    scatter_scale_per_nm: float = 0.03,
+) -> dict[str, ComplexArray]:
+    """Generate fake FDTD data as ``{'h1w40': matrix, ...}`` for demos."""
+    cases = make_demo_fdtd_cases(
+        heights_nm=heights_nm,
+        widths_nm=widths_nm,
+        shape=shape,
+        pixel_size_um=pixel_size_um,
+        wavelength_um=wavelength_um,
+        phase_scale=phase_scale,
+        profile=profile,
+        carrier_na=carrier_na,
+        scatter_scale_per_nm=scatter_scale_per_nm,
+    )
+    data: dict[str, ComplexArray] = {}
+    for case in cases:
+        if case.height_nm is None or case.width_nm is None:
+            raise ValueError("demo cases must have height_nm and width_nm")
+        key = f"h{case.height_nm:g}w{case.width_nm:g}"
+        data[key] = case.field
+    return data
+
+
 def _prepare_field(mat: ArrayLike, reference_field: Optional[Union[complex, ArrayLike]]) -> ComplexArray:
     field = np.asarray(mat, dtype=np.complex128)
     if field.ndim != 2:
@@ -429,3 +618,10 @@ def _validate_na_range(na_inner: float, na_outer: float) -> None:
         raise ValueError("na_inner must be non-negative")
     if na_outer < na_inner:
         raise ValueError("na_outer must be greater than or equal to na_inner")
+
+
+def _parse_height_width_from_key(key: str) -> Tuple[Optional[float], Optional[float]]:
+    match = _KEY_PATTERN.search(key)
+    if match is None:
+        return None, None
+    return float(match.group("height")), float(match.group("width"))

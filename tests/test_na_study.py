@@ -2,8 +2,11 @@ import numpy as np
 import pytest
 
 from fourier_optics.na_study import (
+    cases_from_fdtd_dict,
     collected_na_energy,
+    collected_na_energy_from_dict,
     gaussian_width_from_sevd_height,
+    make_demo_fdtd_dict,
     make_demo_fdtd_cases,
     pupil_energy_distribution,
     radial_energy_density,
@@ -63,3 +66,42 @@ def test_make_demo_fdtd_cases_has_metadata() -> None:
     assert cases[0].field.shape == (64, 64)
     assert cases[0].sevd_nm is not None
     assert np.iscomplexobj(cases[0].field)
+
+
+def test_cases_from_fdtd_dict_parses_key_metadata() -> None:
+    data_fdtd = {
+        "h1w40": np.ones((8, 8), dtype=np.complex128),
+        "h2.5w60": np.ones((8, 8), dtype=np.complex128),
+    }
+
+    cases = cases_from_fdtd_dict(data_fdtd, ["h2.5w60", "h1w40"])
+
+    assert cases[0].height_nm == pytest.approx(2.5)
+    assert cases[0].width_nm == pytest.approx(60.0)
+    assert cases[0].sevd_nm is not None
+    assert cases[1].title == "h1w40"
+
+
+def test_collected_na_energy_from_dict_matches_direct_call() -> None:
+    data_fdtd = make_demo_fdtd_dict(
+        heights_nm=(1.0,),
+        widths_nm=(40.0,),
+        shape=(64, 64),
+        pixel_size_um=0.002,
+    )
+
+    from_dict = collected_na_energy_from_dict(
+        data_fdtd,
+        "h1w40",
+        pixel_size_um=0.002,
+        wavelength_um=0.0135,
+        reference_field=1.0,
+    )
+    direct = collected_na_energy(
+        data_fdtd["h1w40"],
+        pixel_size_um=0.002,
+        wavelength_um=0.0135,
+        reference_field=1.0,
+    )
+
+    assert from_dict == pytest.approx(direct)
