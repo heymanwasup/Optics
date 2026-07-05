@@ -10,6 +10,7 @@ from fourier_optics.na_study import (
     make_demo_fdtd_cases,
     pupil_energy_distribution,
     radial_energy_density,
+    sevd,
     sevd_from_gaussian_height_width,
 )
 
@@ -52,6 +53,10 @@ def test_sevd_width_round_trip() -> None:
     width = gaussian_width_from_sevd_height(sevd, 2.5)
 
     assert width == pytest.approx(60.0)
+
+
+def test_sevd_wrapper_uses_default_gaussian_formula() -> None:
+    assert sevd(2.5, 60.0) == pytest.approx(sevd_from_gaussian_height_width(2.5, 60.0))
 
 
 def test_make_demo_fdtd_cases_has_metadata() -> None:

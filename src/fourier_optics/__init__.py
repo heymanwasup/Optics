@@ -24,6 +24,7 @@ from .na_study import (
     plot_cases_pupil_and_radial,
     plot_sevd_energy_trends,
     radial_energy_density,
+    sevd,
     sevd_from_gaussian_height_width,
 )
 from .SimTrans import (
@@ -75,6 +76,7 @@ __all__ = [
     "radial_energy_density",
     "radial_pupil_energy_density",
     "save_photon_defect_demo_figures",
+    "sevd",
     "sevd_from_gaussian_height_width",
     "summarize_photon_image",
 ]

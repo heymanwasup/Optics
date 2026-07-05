@@ -55,7 +55,7 @@ def case_from_key(
     height = parsed_height if height_nm is None else float(height_nm)
     width = parsed_width if width_nm is None else float(width_nm)
     if sevd_nm is None and height is not None and width is not None:
-        sevd_nm = sevd_from_gaussian_height_width(height, width)
+        sevd_nm = sevd(height, width)
     return FDTDCase(
         title=key if title is None else title,
         field=np.asarray(field, dtype=np.complex128),
@@ -114,6 +114,15 @@ def collected_na_energy_from_dict(
         na_outer=na_outer,
         reference_field=reference_field,
     )
+
+
+def sevd(h: float, w: float) -> float:
+    """Return SEVD from defect height and width.
+
+    Replace this function in your work environment if your SEVD definition
+    differs from the default circular-Gaussian FWHM convention.
+    """
+    return sevd_from_gaussian_height_width(h, w)
 
 
 def sevd_from_gaussian_height_width(
@@ -391,7 +400,7 @@ def plot_sevd_energy_trends(
         if case.sevd_nm is None:
             if case.height_nm is None or case.width_nm is None:
                 raise ValueError("each case needs sevd_nm or both height_nm and width_nm")
-            sevd_nm = sevd_from_gaussian_height_width(case.height_nm, case.width_nm)
+            sevd_nm = sevd(case.height_nm, case.width_nm)
         else:
             sevd_nm = float(case.sevd_nm)
         if case.height_nm is None:
@@ -516,7 +525,7 @@ def make_demo_fdtd_cases(
                 carrier_phase = 2.0 * np.pi * carrier_fx * (xx_nm / 1000.0)
                 scattered = scatter_scale_per_nm * height_map_nm * np.exp(1j * carrier_phase)
                 field = (1.0 + scattered).astype(np.complex128)
-            sevd_nm = sevd_from_gaussian_height_width(float(height_nm), float(width_nm))
+            sevd_nm = sevd(float(height_nm), float(width_nm))
             cases.append(
                 FDTDCase(
                     title=f"h={height_nm:g} nm, w={width_nm:g} nm",
