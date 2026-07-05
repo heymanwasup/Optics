@@ -9,6 +9,17 @@ from .field_simulation import (
 )
 from .buildimage import PadingDefectsMatrix, build_def_lib, build_picture, plot_picture
 from .hopkins import HopkinsImagingModel
+from .na_study import (
+    FDTDCase,
+    PupilEnergy,
+    collected_na_energy,
+    gaussian_width_from_sevd_height,
+    make_demo_fdtd_cases,
+    plot_cases_pupil_and_radial,
+    plot_sevd_energy_trends,
+    radial_energy_density,
+    sevd_from_gaussian_height_width,
+)
 from .SimTrans import (
     SimTrans,
     build_photon_defect_demo,
@@ -24,25 +35,34 @@ from .SimTrans import (
 
 __all__ = [
     "FieldSimulation",
+    "FDTDCase",
     "HopkinsImagingModel",
     "PadingDefectsMatrix",
+    "PupilEnergy",
     "SimTrans",
     "build_def_lib",
     "build_picture",
     "build_photon_defect_demo",
     "calculate_pupil_energy",
+    "collected_na_energy",
     "example_photon_array_config",
+    "gaussian_width_from_sevd_height",
     "gaussian_defect_library",
     "gaussian_defect_matrix",
     "generate_example_photon_array",
+    "make_demo_fdtd_cases",
     "photon_defect_demo_params",
     "photon_defect_array",
     "plot_pupil_energy_distribution",
     "plot_picture",
     "plot_radial_pupil_energy_density",
+    "plot_cases_pupil_and_radial",
+    "plot_sevd_energy_trends",
     "pupil_energy_distribution",
     "pupil_na_grid",
+    "radial_energy_density",
     "radial_pupil_energy_density",
     "save_photon_defect_demo_figures",
+    "sevd_from_gaussian_height_width",
     "summarize_photon_image",
 ]
