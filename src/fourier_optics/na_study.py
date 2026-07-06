@@ -253,6 +253,11 @@ def plot_cases_pupil_and_radial(
     na_outer: float = 0.28,
     reference_field: Optional[Union[complex, ArrayLike]] = None,
     max_na: Optional[float] = 0.8,
+    pupil_min_na: float = 0.0,
+    pupil_max_na: Optional[float] = None,
+    radial_min_na: float = 0.0,
+    radial_max_na: Optional[float] = None,
+    radial_log_y: bool = False,
     bins: Optional[Union[int, ArrayLike]] = None,
     log_floor: float = 1e-14,
     cmap: str = "inferno",
@@ -273,9 +278,16 @@ def plot_cases_pupil_and_radial(
         )
         for case in cases
     ]
-    if max_na is None:
-        max_na = max(float(np.nanmax(pupil.na_radius)) for pupil in pupils)
-    _validate_positive(max_na, "max_na")
+    if pupil_max_na is None:
+        pupil_max_na = max_na
+    if radial_max_na is None:
+        radial_max_na = max_na
+    if pupil_max_na is None:
+        pupil_max_na = max(float(np.nanmax(pupil.na_radius)) for pupil in pupils)
+    if radial_max_na is None:
+        radial_max_na = max(float(np.nanmax(pupil.na_radius)) for pupil in pupils)
+    _validate_na_display_range(pupil_min_na, pupil_max_na, "pupil")
+    _validate_na_display_range(radial_min_na, radial_max_na, "radial")
 
     cols = min(3, len(cases))
     rows = int(np.ceil(len(cases) / cols))
@@ -284,7 +296,7 @@ def plot_cases_pupil_and_radial(
     image = None
 
     for ax, case, pupil in zip(map_axes, cases, pupils):
-        visible = pupil.na_radius <= max_na
+        visible = (pupil.na_radius >= pupil_min_na) & (pupil.na_radius <= pupil_max_na)
         scale = float(np.nanmax(pupil.energy[visible])) if np.any(visible) else float(pupil.energy.max())
         scale = scale if scale > 0 else 1.0
         plot_data = np.full_like(pupil.energy, np.nan, dtype=np.float64)
@@ -305,8 +317,10 @@ def plot_cases_pupil_and_radial(
         )
         ax.add_patch(plt.Circle((0.0, 0.0), na_inner, fill=False, color="#4cc9f0", linewidth=1.4))
         ax.add_patch(plt.Circle((0.0, 0.0), na_outer, fill=False, color="#f72585", linewidth=1.4))
-        ax.set_xlim(-max_na, max_na)
-        ax.set_ylim(-max_na, max_na)
+        if pupil_min_na > 0:
+            ax.add_patch(plt.Circle((0.0, 0.0), pupil_min_na, fill=False, color="0.65", linewidth=0.9, linestyle="--"))
+        ax.set_xlim(-pupil_max_na, pupil_max_na)
+        ax.set_ylim(-pupil_max_na, pupil_max_na)
         ax.set_aspect("equal", adjustable="box")
         ax.set_title(case.title)
         ax.set_xlabel("NAx")
@@ -328,9 +342,18 @@ def plot_cases_pupil_and_radial(
             normalize=False,
             reference_field=reference_field,
         )
-        ax.plot(r_na, rho, linewidth=1.9, label=case.title)
+        visible = (r_na >= radial_min_na) & (r_na <= radial_max_na)
+        plot_r = r_na[visible]
+        plot_rho = rho[visible]
+        if radial_log_y:
+            positive = plot_rho > 0
+            plot_r = plot_r[positive]
+            plot_rho = plot_rho[positive]
+        ax.plot(plot_r, plot_rho, linewidth=1.9, label=case.title)
     ax.axvspan(na_inner, na_outer, color="0.82", alpha=0.45, label=f"PO NA {na_inner:.2f}-{na_outer:.2f}")
-    ax.set_xlim(0.0, max_na)
+    ax.set_xlim(radial_min_na, radial_max_na)
+    if radial_log_y:
+        ax.set_yscale("log")
     ax.set_xlabel("r (NA)")
     ax.set_ylabel("absolute radial energy density")
     ax.set_title("Absolute radial energy density comparison")
@@ -348,6 +371,11 @@ def plot_fdtd_dict_pupil_and_radial(
     na_outer: float = 0.28,
     reference_field: Optional[Union[complex, ArrayLike]] = None,
     max_na: Optional[float] = 0.8,
+    pupil_min_na: float = 0.0,
+    pupil_max_na: Optional[float] = None,
+    radial_min_na: float = 0.0,
+    radial_max_na: Optional[float] = None,
+    radial_log_y: bool = False,
     bins: Optional[Union[int, ArrayLike]] = None,
     titles: Optional[Mapping[str, str]] = None,
     heights_nm: Optional[Mapping[str, float]] = None,
@@ -373,6 +401,11 @@ def plot_fdtd_dict_pupil_and_radial(
         na_outer=na_outer,
         reference_field=reference_field,
         max_na=max_na,
+        pupil_min_na=pupil_min_na,
+        pupil_max_na=pupil_max_na,
+        radial_min_na=radial_min_na,
+        radial_max_na=radial_max_na,
+        radial_log_y=radial_log_y,
         bins=bins,
         log_floor=log_floor,
         cmap=cmap,
@@ -627,6 +660,15 @@ def _validate_na_range(na_inner: float, na_outer: float) -> None:
         raise ValueError("na_inner must be non-negative")
     if na_outer < na_inner:
         raise ValueError("na_outer must be greater than or equal to na_inner")
+
+
+def _validate_na_display_range(na_min: float, na_max: float, name: str) -> None:
+    if na_min < 0:
+        raise ValueError(f"{name}_min_na must be non-negative")
+    if na_max <= 0:
+        raise ValueError(f"{name}_max_na must be positive")
+    if na_max < na_min:
+        raise ValueError(f"{name}_max_na must be greater than or equal to {name}_min_na")
 
 
 def _parse_height_width_from_key(key: str) -> Tuple[Optional[float], Optional[float]]:

@@ -8,6 +8,7 @@ from fourier_optics.na_study import (
     gaussian_width_from_sevd_height,
     make_demo_fdtd_dict,
     make_demo_fdtd_cases,
+    plot_fdtd_dict_pupil_and_radial,
     pupil_energy_distribution,
     radial_energy_density,
     sevd,
@@ -110,3 +111,33 @@ def test_collected_na_energy_from_dict_matches_direct_call() -> None:
     )
 
     assert from_dict == pytest.approx(direct)
+
+
+def test_plot_fdtd_dict_pupil_and_radial_supports_independent_na_ranges() -> None:
+    import matplotlib.pyplot as plt
+
+    data_fdtd = make_demo_fdtd_dict(
+        heights_nm=(1.0,),
+        widths_nm=(40.0, 80.0),
+        shape=(64, 64),
+        pixel_size_um=0.002,
+    )
+
+    fig_maps, fig_radial = plot_fdtd_dict_pupil_and_radial(
+        data_fdtd,
+        ["h1w40", "h1w80"],
+        pixel_size_um=0.002,
+        wavelength_um=0.0135,
+        reference_field=1.0,
+        pupil_min_na=0.05,
+        pupil_max_na=0.45,
+        radial_min_na=0.10,
+        radial_max_na=0.28,
+        radial_log_y=True,
+    )
+
+    assert fig_maps.axes[0].get_xlim() == pytest.approx((-0.45, 0.45))
+    assert fig_radial.axes[0].get_xlim() == pytest.approx((0.10, 0.28))
+    assert fig_radial.axes[0].get_yscale() == "log"
+    plt.close(fig_maps)
+    plt.close(fig_radial)
