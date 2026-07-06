@@ -39,8 +39,10 @@ from .SimTrans import (
     save_photon_defect_demo_figures,
     summarize_photon_image,
 )
+from .small_tools import array2d_to_tif
 
 __all__ = [
+    "array2d_to_tif",
     "FieldSimulation",
     "FDTDCase",
     "HopkinsImagingModel",
