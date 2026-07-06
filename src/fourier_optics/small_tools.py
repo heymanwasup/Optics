@@ -44,11 +44,11 @@ def array2d_to_tif(
     output_path: PathLike,
     *,
     overwrite: bool = True,
-    dtype: DTypeLike = "uint8",
+    dtype: DTypeLike = "uint16",
 ) -> Path:
     """Save a 2D NumPy-compatible array as a grayscale TIFF file.
 
-    By default the data is normalized to uint8, which produces a baseline TIFF
+    By default the data is normalized to uint16, which produces a 16-bit TIFF
     that opens reliably in ImageJ and common OS image viewers. Pass dtype=None
     to preserve the input dtype for scientific data exchange.
 
