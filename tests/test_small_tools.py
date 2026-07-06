@@ -5,12 +5,32 @@ import tifffile
 from fourier_optics import array2d_to_tif
 
 
-def test_array2d_to_tif_writes_readable_tiff(tmp_path):
+def test_array2d_to_tif_writes_viewer_compatible_tiff_by_default(tmp_path):
     array = np.arange(12, dtype=np.float32).reshape(3, 4)
     path = array2d_to_tif(array, tmp_path / "nested" / "image.tif")
 
     assert path.exists()
+    image = tifffile.imread(path)
+    assert image.dtype == np.uint8
+    assert image.min() == 0
+    assert image.max() == 255
+
+
+def test_array2d_to_tif_can_preserve_dtype(tmp_path):
+    array = np.arange(12, dtype=np.float32).reshape(3, 4)
+    path = array2d_to_tif(array, tmp_path / "image.tif", dtype=None)
+
     np.testing.assert_array_equal(tifffile.imread(path), array)
+
+
+def test_array2d_to_tif_can_write_uint16(tmp_path):
+    array = np.arange(12, dtype=np.float32).reshape(3, 4)
+    path = array2d_to_tif(array, tmp_path / "image.tif", dtype="uint16")
+
+    image = tifffile.imread(path)
+    assert image.dtype == np.uint16
+    assert image.min() == 0
+    assert image.max() == 65535
 
 
 def test_array2d_to_tif_rejects_non_2d_array(tmp_path):
