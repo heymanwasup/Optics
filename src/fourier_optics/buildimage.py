@@ -52,11 +52,14 @@ class PadingDefectsMatrix:
         self,
         def_val: ArrayLike,
         n_def_copy: int,
+        n_imgs: int = 1,
         rng_seed: Optional[int] = None,
         max_attempts: int = 100_000,
-    ) -> tuple[FloatArray, list[Shape]]:
+    ) -> tuple[list[FloatArray], list[list[Shape]]]:
         if n_def_copy < 0:
             raise ValueError("n_def_copy must be non-negative")
+        if n_imgs <= 0:
+            raise ValueError("n_imgs must be positive")
         if max_attempts <= 0:
             raise ValueError("max_attempts must be positive")
 
@@ -67,27 +70,18 @@ class PadingDefectsMatrix:
             raise ValueError("def_val must fit inside image_shape")
 
         rng = np.random.default_rng(rng_seed)
-        image = np.full(self.image_shape, self.bg_photon_num, dtype=np.float64)
-        boxes: list[tuple[int, int, int, int]] = []
-        centers: list[Shape] = []
-        attempts = 0
-
-        while len(centers) < n_def_copy and attempts < max_attempts:
-            attempts += 1
-            row_start = int(rng.integers(0, image_rows - patch_rows + 1))
-            col_start = int(rng.integers(0, image_cols - patch_cols + 1))
-            box = (row_start, row_start + patch_rows, col_start, col_start + patch_cols)
-            if any(self._boxes_overlap(box, existing) for existing in boxes):
-                continue
-
-            center = (row_start + patch_rows // 2, col_start + patch_cols // 2)
-            self._paste_patch(image, patch, center)
-            boxes.append(box)
-            centers.append(center)
-
-        if len(centers) != n_def_copy:
-            raise RuntimeError("could not place all defects without overlap")
-        return image, centers
+        images: list[FloatArray] = []
+        coords_list: list[list[Shape]] = []
+        for _ in range(n_imgs):
+            image, centers = self._build_one_random_image(
+                patch=patch,
+                n_def_copy=n_def_copy,
+                rng=rng,
+                max_attempts=max_attempts,
+            )
+            images.append(image)
+            coords_list.append(centers)
+        return images, coords_list
 
     def _validate_shape(self, shape: Shape, name: str) -> Shape:
         if len(shape) != 2 or min(shape) <= 0:
@@ -153,6 +147,37 @@ class PadingDefectsMatrix:
             or first_col_end <= second_col_start
             or second_col_end <= first_col_start
         )
+
+    def _build_one_random_image(
+        self,
+        patch: FloatArray,
+        n_def_copy: int,
+        rng: np.random.Generator,
+        max_attempts: int,
+    ) -> tuple[FloatArray, list[Shape]]:
+        patch_rows, patch_cols = patch.shape
+        image_rows, image_cols = self.image_shape
+        image = np.full(self.image_shape, self.bg_photon_num, dtype=np.float64)
+        boxes: list[tuple[int, int, int, int]] = []
+        centers: list[Shape] = []
+        attempts = 0
+
+        while len(centers) < n_def_copy and attempts < max_attempts:
+            attempts += 1
+            row_start = int(rng.integers(0, image_rows - patch_rows + 1))
+            col_start = int(rng.integers(0, image_cols - patch_cols + 1))
+            box = (row_start, row_start + patch_rows, col_start, col_start + patch_cols)
+            if any(self._boxes_overlap(box, existing) for existing in boxes):
+                continue
+
+            center = (row_start + patch_rows // 2, col_start + patch_cols // 2)
+            self._paste_patch(image, patch, center)
+            boxes.append(box)
+            centers.append(center)
+
+        if len(centers) != n_def_copy:
+            raise RuntimeError("could not place all defects without overlap")
+        return image, centers
 
 
 def build_def_lib(
@@ -224,10 +249,11 @@ def build_random_picture(
     bg_photon_num: float,
     image_shape: Shape,
     n_def_copy: int,
+    n_imgs: int = 1,
     rng_seed: Optional[int] = None,
     max_attempts: int = 100_000,
-) -> tuple[FloatArray, list[Shape]]:
-    """Randomly place non-overlapping copies of one defect inside an image."""
+) -> tuple[list[FloatArray], list[list[Shape]]]:
+    """Randomly place non-overlapping copies of one defect inside images."""
 
     builder = PadingDefectsMatrix(
         defs_dict={"def1": def_val},
@@ -238,6 +264,7 @@ def build_random_picture(
     return builder.build_random(
         def_val=def_val,
         n_def_copy=n_def_copy,
+        n_imgs=n_imgs,
         rng_seed=rng_seed,
         max_attempts=max_attempts,
     )

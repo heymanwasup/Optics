@@ -72,32 +72,39 @@ def test_build_picture_from_list_matches_dict_values() -> None:
 def test_build_random_picture_returns_non_overlapping_coordinates() -> None:
     defect = np.ones((9, 7)) * 10.0
 
-    image, coords = build_random_picture(
+    images, coords_list = build_random_picture(
         def_val=defect,
         bg_photon_num=1.0,
         image_shape=(80, 90),
         n_def_copy=8,
+        n_imgs=3,
         rng_seed=42,
     )
 
-    assert image.shape == (80, 90)
-    assert len(coords) == 8
-    assert coords == build_random_picture(defect, 1.0, (80, 90), 8, rng_seed=42)[1]
+    assert len(images) == 3
+    assert len(coords_list) == 3
+    assert coords_list == build_random_picture(defect, 1.0, (80, 90), 8, n_imgs=3, rng_seed=42)[1]
 
-    boxes = []
-    for row, col in coords:
-        row_start = row - defect.shape[0] // 2
-        col_start = col - defect.shape[1] // 2
-        box = (row_start, row_start + defect.shape[0], col_start, col_start + defect.shape[1])
-        assert box[0] >= 0
-        assert box[2] >= 0
-        assert box[1] <= image.shape[0]
-        assert box[3] <= image.shape[1]
-        assert all(
-            box[1] <= other[0] or other[1] <= box[0] or box[3] <= other[2] or other[3] <= box[2]
-            for other in boxes
-        )
-        boxes.append(box)
+    for image, coords in zip(images, coords_list):
+        assert image.shape == (80, 90)
+        assert len(coords) == 8
+        boxes = []
+        for row, col in coords:
+            row_start = row - defect.shape[0] // 2
+            col_start = col - defect.shape[1] // 2
+            box = (row_start, row_start + defect.shape[0], col_start, col_start + defect.shape[1])
+            assert box[0] >= 0
+            assert box[2] >= 0
+            assert box[1] <= image.shape[0]
+            assert box[3] <= image.shape[1]
+            assert all(
+                box[1] <= other[0]
+                or other[1] <= box[0]
+                or box[3] <= other[2]
+                or other[3] <= box[2]
+                for other in boxes
+            )
+            boxes.append(box)
 
 
 def test_build_def_lib_returns_shrinking_bright_defects() -> None:
