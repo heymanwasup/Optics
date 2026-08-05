@@ -3,7 +3,13 @@ from pathlib import Path
 
 import numpy as np
 
-from fourier_optics import PadingDefectsMatrix, build_def_lib, build_picture
+from fourier_optics import (
+    PadingDefectsMatrix,
+    build_def_lib,
+    build_picture,
+    build_picture_from_list,
+    build_random_picture,
+)
 
 
 def test_build_picture_uses_ten_rows_and_def_count_columns_by_default() -> None:
@@ -39,6 +45,61 @@ def test_build_picture_smooths_patch_edges() -> None:
     assert 1.0 < image[9, 9] < 11.0
 
 
+def test_build_picture_from_list_matches_dict_values() -> None:
+    defs = {
+        "def1": np.ones((5, 5)) * 10.0,
+        "def2": np.ones((5, 5)) * 20.0,
+    }
+
+    dict_image = build_picture(
+        Defs_dict=defs,
+        bg_photon_num=2.0,
+        image_shape=(80, 80),
+        def_matrix_shape=(2, 2),
+        def_matrix_step=20,
+    )
+    list_image = build_picture_from_list(
+        defs_list=list(defs.values()),
+        bg_photon_num=2.0,
+        image_shape=(80, 80),
+        def_matrix_shape=(2, 2),
+        def_matrix_step=20,
+    )
+
+    np.testing.assert_allclose(list_image, dict_image)
+
+
+def test_build_random_picture_returns_non_overlapping_coordinates() -> None:
+    defect = np.ones((9, 7)) * 10.0
+
+    image, coords = build_random_picture(
+        def_val=defect,
+        bg_photon_num=1.0,
+        image_shape=(80, 90),
+        n_def_copy=8,
+        rng_seed=42,
+    )
+
+    assert image.shape == (80, 90)
+    assert len(coords) == 8
+    assert coords == build_random_picture(defect, 1.0, (80, 90), 8, rng_seed=42)[1]
+
+    boxes = []
+    for row, col in coords:
+        row_start = row - defect.shape[0] // 2
+        col_start = col - defect.shape[1] // 2
+        box = (row_start, row_start + defect.shape[0], col_start, col_start + defect.shape[1])
+        assert box[0] >= 0
+        assert box[2] >= 0
+        assert box[1] <= image.shape[0]
+        assert box[3] <= image.shape[1]
+        assert all(
+            box[1] <= other[0] or other[1] <= box[0] or box[3] <= other[2] or other[3] <= box[2]
+            for other in boxes
+        )
+        boxes.append(box)
+
+
 def test_build_def_lib_returns_shrinking_bright_defects() -> None:
     defs = build_def_lib(def_count=4, matrix_shape=(21, 21), fwhm_range=(10.0, 4.0))
 
@@ -54,7 +115,13 @@ def test_buildimage_module_public_shape() -> None:
     functions = [node.name for node in tree.body if isinstance(node, ast.FunctionDef)]
     classes = [node.name for node in tree.body if isinstance(node, ast.ClassDef)]
 
-    assert functions == ["build_def_lib", "build_picture", "plot_picture"]
+    assert functions == [
+        "build_def_lib",
+        "build_picture",
+        "build_picture_from_list",
+        "build_random_picture",
+        "plot_picture",
+    ]
     assert classes == ["PadingDefectsMatrix"]
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Mapping, Optional, Tuple, Union
+from typing import Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -47,6 +47,47 @@ class PadingDefectsMatrix:
                 patch = self._prepare_patch(self.defs_dict[name])
                 self._paste_patch(image, patch, center)
         return image
+
+    def build_random(
+        self,
+        def_val: ArrayLike,
+        n_def_copy: int,
+        rng_seed: Optional[int] = None,
+        max_attempts: int = 100_000,
+    ) -> tuple[FloatArray, list[Shape]]:
+        if n_def_copy < 0:
+            raise ValueError("n_def_copy must be non-negative")
+        if max_attempts <= 0:
+            raise ValueError("max_attempts must be positive")
+
+        patch = self._prepare_patch(def_val)
+        patch_rows, patch_cols = patch.shape
+        image_rows, image_cols = self.image_shape
+        if patch_rows > image_rows or patch_cols > image_cols:
+            raise ValueError("def_val must fit inside image_shape")
+
+        rng = np.random.default_rng(rng_seed)
+        image = np.full(self.image_shape, self.bg_photon_num, dtype=np.float64)
+        boxes: list[tuple[int, int, int, int]] = []
+        centers: list[Shape] = []
+        attempts = 0
+
+        while len(centers) < n_def_copy and attempts < max_attempts:
+            attempts += 1
+            row_start = int(rng.integers(0, image_rows - patch_rows + 1))
+            col_start = int(rng.integers(0, image_cols - patch_cols + 1))
+            box = (row_start, row_start + patch_rows, col_start, col_start + patch_cols)
+            if any(self._boxes_overlap(box, existing) for existing in boxes):
+                continue
+
+            center = (row_start + patch_rows // 2, col_start + patch_cols // 2)
+            self._paste_patch(image, patch, center)
+            boxes.append(box)
+            centers.append(center)
+
+        if len(centers) != n_def_copy:
+            raise RuntimeError("could not place all defects without overlap")
+        return image, centers
 
     def _validate_shape(self, shape: Shape, name: str) -> Shape:
         if len(shape) != 2 or min(shape) <= 0:
@@ -99,6 +140,20 @@ class PadingDefectsMatrix:
             patch_row_start:patch_row_end, patch_col_start:patch_col_end
         ]
 
+    def _boxes_overlap(
+        self,
+        first: tuple[int, int, int, int],
+        second: tuple[int, int, int, int],
+    ) -> bool:
+        first_row_start, first_row_end, first_col_start, first_col_end = first
+        second_row_start, second_row_end, second_col_start, second_col_end = second
+        return not (
+            first_row_end <= second_row_start
+            or second_row_end <= first_row_start
+            or first_col_end <= second_col_start
+            or second_col_end <= first_col_start
+        )
+
 
 def build_def_lib(
     def_count: int = 10,
@@ -143,6 +198,49 @@ def build_picture(
         def_matrix_shape=def_matrix_shape,
         def_matrix_step=def_matrix_step,
     ).build()
+
+
+def build_picture_from_list(
+    defs_list: Sequence[ArrayLike],
+    bg_photon_num: float,
+    image_shape: Shape,
+    def_matrix_shape: Optional[Shape] = None,
+    def_matrix_step: int = 80,
+) -> FloatArray:
+    """Build a photon-count image from a defect list."""
+
+    defs_dict = {f"def{index}": value for index, value in enumerate(defs_list, start=1)}
+    return build_picture(
+        Defs_dict=defs_dict,
+        bg_photon_num=bg_photon_num,
+        image_shape=image_shape,
+        def_matrix_shape=def_matrix_shape,
+        def_matrix_step=def_matrix_step,
+    )
+
+
+def build_random_picture(
+    def_val: ArrayLike,
+    bg_photon_num: float,
+    image_shape: Shape,
+    n_def_copy: int,
+    rng_seed: Optional[int] = None,
+    max_attempts: int = 100_000,
+) -> tuple[FloatArray, list[Shape]]:
+    """Randomly place non-overlapping copies of one defect inside an image."""
+
+    builder = PadingDefectsMatrix(
+        defs_dict={"def1": def_val},
+        bg_photon_num=bg_photon_num,
+        image_shape=image_shape,
+        def_matrix_shape=(1, 1),
+    )
+    return builder.build_random(
+        def_val=def_val,
+        n_def_copy=n_def_copy,
+        rng_seed=rng_seed,
+        max_attempts=max_attempts,
+    )
 
 
 def plot_picture(

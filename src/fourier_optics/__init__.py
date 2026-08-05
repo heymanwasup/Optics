@@ -7,7 +7,14 @@ from .field_simulation import (
     pupil_na_grid,
     radial_pupil_energy_density,
 )
-from .buildimage import PadingDefectsMatrix, build_def_lib, build_picture, plot_picture
+from .buildimage import (
+    PadingDefectsMatrix,
+    build_def_lib,
+    build_picture,
+    build_picture_from_list,
+    build_random_picture,
+    plot_picture,
+)
 from .hopkins import HopkinsImagingModel
 from .na_study import (
     FDTDCase,
@@ -51,6 +58,8 @@ __all__ = [
     "SimTrans",
     "build_def_lib",
     "build_picture",
+    "build_picture_from_list",
+    "build_random_picture",
     "build_photon_defect_demo",
     "calculate_pupil_energy",
     "case_from_key",
